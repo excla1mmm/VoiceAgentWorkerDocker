@@ -53,7 +53,7 @@ def load() -> Settings:
         llm_file=os.environ.get("LLM_FILE") or "gpt-oss-20b-MXFP4.gguf",
         llm_revision=os.environ.get("LLM_REVISION") or "15dcfc7e7c608c6161507211ed43c5b590801b4b",
         llm_gpu_layers=_int("LLM_GPU_LAYERS", 999),
-        llm_slots=_int("LLM_SLOTS", 4),
-        llm_ctx_per_slot=_int("LLM_CTX_PER_SLOT", 8000),
+        llm_slots=_int("LLM_SLOTS", 3),
+        llm_ctx_per_slot=_int("LLM_CTX_PER_SLOT", 16000),
         llm_reasoning_effort=os.environ.get("LLM_REASONING_EFFORT") or "low",
     )
