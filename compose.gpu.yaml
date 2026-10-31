@@ -1,0 +1,14 @@
+# NVIDIA GPU overlay. Requires the NVIDIA driver and NVIDIA Container Toolkit on the host.
+services:
+  worker:
+    image: ${WORKER_IMAGE:-voice-agent-worker:cuda}
+    build:
+      args:
+        LLAMA_IMAGE: ghcr.io/ggml-org/llama.cpp:server-cuda-b11669
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

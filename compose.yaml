@@ -1,0 +1,14 @@
+# CPU image: for trying the speech part with LLM_ENABLED=0. A GPU server adds compose.gpu.yaml (see .env.example).
+services:
+  worker:
+    image: ${WORKER_IMAGE:-voice-agent-worker:cpu}
+    build:
+      context: .
+    init: true
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${PUBLISH_GRPC_PORT:-50051}:50051"
+      - "${PUBLISH_LLM_PORT:-8080}:8080"
+    volumes:
+      - ./models:/models

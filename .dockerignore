@@ -1,0 +1,7 @@
+.git
+.venv
+.env
+models
+src/yandex
+tests
+**/__pycache__

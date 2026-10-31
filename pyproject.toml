@@ -1,0 +1,38 @@
+[project]
+name = "voice-agent-worker"
+version = "0.1.0"
+description = "Local speech and LLM worker for MikoPBX ModuleVoiceAgent: GigaAM, Piper and llama.cpp behind the Yandex SpeechKit gRPC API"
+requires-python = ">=3.12"
+dependencies = [
+    "grpcio>=1.70,<2",
+    "protobuf>=5.29,<7",
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "onnxruntime>=1.20,<2",
+    "onnx-asr==0.12.0",
+    "piper-tts==1.3.0",
+    "huggingface-hub>=0.23",
+    # 0.5.14 declines Russian numerals itself (case=, gender=)
+    "num2words>=0.5.14",
+]
+
+[dependency-groups]
+dev = ["grpcio-tools>=1.70,<2", "pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.6"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["src/yandex"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]

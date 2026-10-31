@@ -1,0 +1,73 @@
+# Voice agent worker
+
+Локальный обработчик для модуля ModuleVoiceAgent. Один контейнер на сервере рядом со станцией заменяет облачные сервисы:
+
+| Роль | Движок | Где считает | Порт |
+|---|---|---|---|
+| Распознавание | GigaAM v3 (`gigaam-v3-e2e-rnnt`) | CPU | 50051 (gRPC) |
+| Синтез | Piper (голоса irina, dmitri, denis) | CPU | 50051 (gRPC) |
+| LLM | llama.cpp, gpt-oss-20b (MXFP4, 12 ГБ) | GPU | 8080 (OpenAI API) |
+
+Ядро модуля говорит с ним как с Yandex SpeechKit: порт 50051 отвечает на `Recognizer/RecognizeStreaming`,
+`Synthesizer/StreamSynthesis` и `Synthesizer/UtteranceSynthesis`, ключ передаётся как `Api-Key`. Голоса модуля
+сопоставлены с Piper в `src/voice_agent_worker/tts.py`.
+
+Нужно: NVIDIA с 16 ГБ видеопамяти и больше, 8 ядер CPU, 32 ГБ RAM, 30 ГБ на диске.
+
+## Запуск на компьютере с GPU
+
+Команды выполняются на Mac, в этой директории. Подключение `gpu-pc` настроено по инструкции `GPU-PC-SSH-setup.docx`.
+
+1. Скопируйте проект и подготовьте Docker с доступом к GPU. Введите пароль Ubuntu, когда он будет запрошен.
+   В конце должна появиться таблица `nvidia-smi` с вашей картой.
+   ```bash
+   COPYFILE_DISABLE=1 tar --no-xattrs -czf - scripts | ssh gpu-pc 'mkdir -p ~/VoiceAgentWorkerDocker && tar -xzf - -C ~/VoiceAgentWorkerDocker'
+   ssh -t gpu-pc 'bash ~/VoiceAgentWorkerDocker/scripts/install-host.sh'
+   ```
+2. Запустите обработчик. Команда выведет ключ, он нужен для настройки модуля.
+   ```bash
+   scripts/deploy.sh gpu-pc
+   ```
+3. Дождитесь загрузки моделей (около 13 ГБ). Готовность видна по строке `speech service on port 50051`.
+   ```bash
+   ssh gpu-pc 'cd ~/VoiceAgentWorkerDocker && docker compose logs -f'
+   ```
+4. Проверьте всю цепочку: синтез, распознавание этой же речи и вызов инструмента в LLM.
+   ```bash
+   ssh gpu-pc 'cd ~/VoiceAgentWorkerDocker && docker compose exec worker python -m voice_agent_worker check'
+   ```
+   На 16 ГБ видеопамяти проверьте, что модель поместилась: в логе `llama-server` не должно быть ошибок выделения памяти.
+
+## Настройка модуля
+
+Нужна ветка `feature/local-engines` модуля. Станция должна видеть адрес компьютера напрямую, через локальную сеть или
+VPN. В настройках модуля укажите, подставив адрес компьютера:
+
+| Поле | Значение |
+|---|---|
+| Ключ Yandex SpeechKit | ключ обработчика |
+| Адрес распознавания (`stt_endpoint`) | `plaintext://<адрес>:50051` |
+| Адрес синтеза (`tts_endpoint`) | `plaintext://<адрес>:50051` |
+| Адрес LLM (`llm_url`) | `http://<адрес>:8080/v1/chat/completions` |
+| Модель LLM (`llm_model`) | `gpt-oss-20b` |
+| Ключ LLM | ключ обработчика |
+
+Адреса без TLS модуль принимает только для 10/8, 172.16/12, 192.168/16, 100.64/10 (Tailscale) и 127/8.
+
+## Что важно знать
+
+- **Без шифрования.** Звук и ключ идут открытым текстом, поэтому порты 50051 и 8080 нельзя открывать в интернет.
+- **Модель другая.** gpt-oss-20b проще gpt-oss-120b, её качество на реальном промпте ещё нужно проверить.
+- **База знаний.** Обработчик не отдаёт эмбеддинги, поэтому модуль выбирает записи по словам, а не по смыслу.
+- **Партиалы.** Промежуточных результатов нет: текст приходит целиком после конца фразы.
+- **Лицензия.** `piper-tts` 1.3 распространяется под GPL-3.0. Для поставки клиентам это нужно решить отдельно.
+
+## Разработка
+
+```bash
+uv sync --group dev
+PATH=.venv/bin:$PATH bash scripts/gen-proto.sh
+uv run pytest
+```
+
+Без GPU: `compose.yaml` собирает CPU-образ (`COMPOSE_FILE=compose.yaml`), а `LLM_ENABLED=0` отключает LLM.
